@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kavango Radio | Live Stream</title>
+    <title>Kavango Radio | bit.ly/kavangoradio</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -51,8 +51,7 @@
                 </div>
             </div>
             <div>
-                <h2 id="listener-title" class="text-lg font-extrabold text-white tracking-tight">Kavango Radio Broadcast</h2>
-                <p id="listener-artist" class="text-xs font-semibold text-rose-400 truncate max-w-[280px]">Loading metadata...</p>
+                <h2 id="listener-title" class="text-lg font-extrabold text-white tracking-tight">Live Broadcast Stream</h2>
             </div>
         </div>
 
@@ -67,9 +66,11 @@
 
             <!-- Custom Built Player around native audio engine -->
             <div class="space-y-4 py-2" id="player-container">
-                <!-- Direct HTML5 Audio element -->
+                <!-- Direct HTML5 Audio element for Secure Shoutcast Stream -->
                 <audio id="audio_1" preload="none" class="hidden">
-                    <source src="https://louise-professor-sodium-james.trycloudflare.com/stream" type="audio/mpeg">
+                    <!-- Update with your FastCast4u or secure HTTPS proxy stream link -->
+                    <source src="https://eu4.fastcast4u.com/proxy/veleskatti?mp=/1" type="audio/mpeg">
+                    <source src="https://eu4.fastcast4u.com/stream/veleskatti" type="audio/mpeg">
                 </audio>
 
                 <!-- Custom High-Tech Play/Pause Control -->
@@ -92,7 +93,7 @@
         <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2 z-10 relative">
             <div class="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                 <span>Signal Visualizer</span>
-                <span id="visualizer-status" class="text-emerald-400 font-mono">Stream Active</span>
+                <span class="text-emerald-400 font-mono">Stream Active</span>
             </div>
             <div class="h-12 w-full bg-slate-900 rounded-xl overflow-hidden p-1">
                 <canvas id="listener-canvas" class="w-full h-full"></canvas>
@@ -102,13 +103,13 @@
     </div>
 
     <script>
-        let audio, playBtn, playIcon, statusText, listenerTitle, listenerArtist;
+        let audio, playBtn, playIcon, statusText;
         let isPlayPending = false;
         let visualizerAnimFrame = null;
 
         const STREAM_URLS = [
-            "https://louise-professor-sodium-james.trycloudflare.com/stream",
-            "https://eu4.fastcast4u.com/proxy/veleskatti?mp=/1"
+            "https://eu4.fastcast4u.com/proxy/veleskatti?mp=/1",
+            "https://eu4.fastcast4u.com/stream/veleskatti"
         ];
         let currentStreamIdx = 0;
 
@@ -117,51 +118,13 @@
             playBtn = document.getElementById('custom-play-btn');
             playIcon = document.getElementById('play-icon');
             statusText = document.getElementById('status-text');
-            listenerTitle = document.getElementById('listener-title');
-            listenerArtist = document.getElementById('listener-artist');
 
             if (audio) {
-                if (!audio.src) {
-                    audio.src = STREAM_URLS[currentStreamIdx];
-                }
-
                 audio.onerror = (e) => {
                     console.warn("Audio stream error, trying fallback source...", e);
                     currentStreamIdx = (currentStreamIdx + 1) % STREAM_URLS.length;
                     audio.src = STREAM_URLS[currentStreamIdx];
-                    audio.play().catch(err => console.error("Fallback play error:", err));
                 };
-            }
-            
-            fetchMetadata();
-            setInterval(fetchMetadata, 10000);
-        }
-
-        async function fetchMetadata() {
-            try {
-                const res = await fetch("https://louise-professor-sodium-james.trycloudflare.com/stats?json=1");
-                if (res.ok) {
-                    const data = await res.json();
-                    let title = "Kavango Radio Broadcast";
-                    let artist = "Live Stream";
-                    
-                    if (data.icestats && data.icestats.source) {
-                        let sources = Array.isArray(data.icestats.source) ? data.icestats.source : [data.icestats.source];
-                        let activeSource = sources.find(s => s.listenurl && s.listenurl.includes("/stream")) || sources[0];
-                        if (activeSource && activeSource.title) {
-                            title = activeSource.title;
-                        }
-                        if (activeSource && activeSource.artist) {
-                            artist = activeSource.artist;
-                        } else if (activeSource && activeSource.server_name) {
-                            artist = activeSource.server_name;
-                        }
-                    }
-                    if (listenerTitle) listenerTitle.innerText = title;
-                    if (listenerArtist) listenerArtist.innerText = artist;
-                }
-            } catch (err) {
-                console.log("Metadata check silent pass.");
             }
         }
 
@@ -175,28 +138,25 @@
                     statusText.innerText = "Connecting live audio stream...";
                     statusText.className = "text-xs font-semibold text-amber-400 animate-pulse";
 
+                    audio.src = STREAM_URLS[currentStreamIdx];
+                    audio.load();
+                    
                     const playPromise = audio.play();
                     if (playPromise !== undefined) {
                         await playPromise;
+                        playIcon.className = "fa-solid fa-pause ml-0";
+                        statusText.innerText = "Broadcasting Live";
+                        statusText.className = "text-xs font-semibold text-emerald-400 animate-pulse";
+                        startSimulatedVisualizer();
                     }
                 } catch (err) {
-                    console.warn("Playback warning (benign live buffer event):", err);
-                    // If audio is actually playing despite the promise warning, ignore error!
-                    if (audio.paused) {
-                        statusText.innerText = "Stream offline or blocked. Check connection.";
-                        statusText.className = "text-xs font-semibold text-rose-400";
-                        stopVisualizer();
-                        isPlayPending = false;
-                        return;
-                    }
+                    console.error("Playback execution error:", err);
+                    statusText.innerText = "Stream offline or blocked. Check connection.";
+                    statusText.className = "text-xs font-semibold text-rose-400";
+                    stopVisualizer();
                 } finally {
                     isPlayPending = false;
                 }
-
-                playIcon.className = "fa-solid fa-pause ml-0";
-                statusText.innerText = "Broadcasting Live";
-                statusText.className = "text-xs font-semibold text-emerald-400 animate-pulse";
-                startSimulatedVisualizer();
             } else {
                 audio.pause();
                 playIcon.className = "fa-solid fa-play ml-1";
